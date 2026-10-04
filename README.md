@@ -1,4 +1,5 @@
 # Visual LaTeX Editor · 纸间
+![和贝伦卡斯泰露一起编辑吧！](https://github.com/Kotori-cjk/visual_latex_editor/blob/main/docs/140100396_p1.png)
 
 [![Tests](https://github.com/Kotori-cjk/visual_latex_editor/actions/workflows/tests.yml/badge.svg)](https://github.com/Kotori-cjk/visual_latex_editor/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -9,7 +10,8 @@ A local, source-backed LaTeX editor. Click text or images in the **actual compil
 
 一个在本机运行的 LaTeX 可视化编辑器：点选真实 PDF 里的段落和图片，在右侧修改，再重新编译。界面为中文，代码和安装说明可用于独立项目。
 
-![和贝伦卡斯泰露一起编辑吧！](https://github.com/Kotori-cjk/visual_latex_editor/blob/main/docs/140100396_p1.png)
+<img width="2549" height="1403" alt="image" src="https://github.com/user-attachments/assets/773d1b6b-2aae-42a1-9c52-64869e27675e" />
+
 
 ## What you can do
 
