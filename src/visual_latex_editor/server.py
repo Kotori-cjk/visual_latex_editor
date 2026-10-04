@@ -78,7 +78,8 @@ def image_pdf(data):
     bg.paste(im, mask=im.getchannel('A'))
     jpeg = io.BytesIO()
     bg.save(jpeg, format='JPEG', quality=95, subsampling=0)
-    hexdata = '\n'.join(jpeg.getvalue().hex()[i:i+100] for i in range(0, len(jpeg.getvalue())*2, 100)) + '>\n'
+    encoded = jpeg.getvalue().hex()
+    hexdata = '\n'.join(encoded[i:i+100] for i in range(0, len(encoded), 100)) + '>\n'
     w, h = bg.size
     paint = f'q {w} 0 0 {h} 0 0 cm /Im0 Do Q\n'
     objs = ['<< /Type /Catalog /Pages 2 0 R >>',
