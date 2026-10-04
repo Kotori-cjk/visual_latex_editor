@@ -1,0 +1,14 @@
+# Editable documents and build history are local user data.
+.visual_latex_editor/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+/pip-*/
+*.log
+*.pid
+.DS_Store
+Thumbs.db

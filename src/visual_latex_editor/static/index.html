@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Visual LaTeX Editor · 纸间</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">纸</span><div><strong>纸间 <span>LaTeX</span></strong><small>可视化报告编辑器</small></div></div>
+    <div class="file-name"><span class="file-dot"></span><span id="document-name">示例文档 · 编辑副本</span><small id="save-status">载入中</small></div>
+    <div class="top-actions">
+      <button id="undo" class="icon-button" title="撤销最近一次保存" disabled>↶</button>
+      <button id="source-toggle">源文件</button>
+      <button id="export-tex">导出 .tex</button>
+      <button id="export-pdf">下载 PDF</button>
+      <button id="compile" class="primary"><span>▶</span> 编译 PDF</button>
+    </div>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-title"><span>文档内容</span><span id="block-count" class="count"></span></div>
+      <label class="search"><span>⌕</span><input id="search" placeholder="查找文字或图片" aria-label="查找文档内容"></label>
+      <div class="side-tabs"><button class="active" data-filter="all">全部</button><button data-filter="figure">图片</button><button data-filter="heading">目录</button></div>
+      <nav id="outline" aria-label="文档块列表"></nav>
+      <div class="sidebar-bottom"><span class="local-dot"></span> 本地编辑，文件保存在电脑上<button id="import" title="导入完整的 .tex 文件">导入 .tex ↗</button></div>
+    </aside>
+    <main class="preview-main">
+      <div class="preview-toolbar"><div><strong>PDF 预览</strong><span id="page-count">等待编译</span></div><div class="view-actions"><button id="zoom-out" title="缩小">−</button><span id="zoom-label">100%</span><button id="zoom-in" title="放大">＋</button><button id="fit">适应宽度</button><button id="regions-toggle" title="显示所有可编辑区域">显示区域</button></div></div>
+      <div id="notice" class="notice"><span id="notice-text">正在生成真实 PDF 预览…</span><button id="log-toggle">查看日志</button></div>
+      <div id="preview-scroll"><div id="pages"><div class="empty-preview"><div class="paper-symbol">T<span>E</span>X</div><h2>正在打开你的报告</h2><p>首次编译后，点击页面中的文字或图片即可编辑。</p><div class="progress-track"><i></i></div></div></div></div>
+      <div class="preview-footer"><span>点击文字或图片 · 右侧修改 · 编译查看结果</span><span id="selected-location"></span></div>
+    </main>
+    <aside class="inspector">
+      <div class="inspector-header"><div><small>当前选中</small><h2 id="inspector-title">开始编辑</h2></div><span id="kind-badge" class="badge">选择内容</span></div>
+      <div id="inspector-empty" class="inspector-empty"><div class="cursor-symbol">↖</div><h3>直接点选页面上的内容</h3><p>文字、公式、表格和图片都可以选中。也可以从左侧列表选择。</p><div class="shortcut"><kbd>Ctrl</kbd> + <kbd>S</kbd> 保存修改</div></div>
+      <div id="editor" hidden>
+        <div class="editor-tabs"><button id="visual-tab" class="active">可视化编辑</button><button id="latex-tab">LaTeX</button></div>
+        <div id="visual-panel"></div>
+        <div id="latex-panel" hidden><label class="field-label" for="block-source">选中内容的 LaTeX</label><textarea id="block-source" class="code-editor" spellcheck="false"></textarea><p class="help">可直接修改公式、表格或命令。编译报错时，保留上一次成功的 PDF。</p></div>
+        <div class="editor-bottom"><span id="edit-status">尚未修改</span><button id="apply" class="primary">保存修改</button></div>
+      </div>
+      <div class="inspector-footnote"><span>✦</span><div>每一次预览都来自真实 LaTeX 编译。<br>修改后点击「编译 PDF」更新页面。</div></div>
+    </aside>
+  </div>
+  <dialog id="source-dialog"><div class="dialog-top"><div><h2>LaTeX 源文件</h2><p>这里可编辑整个文档；图片以文件名引用，导出时自动嵌入。</p></div><button id="source-close" class="icon-button">×</button></div><textarea id="full-source" class="code-editor" spellcheck="false" aria-label="整个 LaTeX 文档"></textarea><div class="dialog-bottom"><span id="source-path"></span><button id="source-save" class="primary">保存源文件</button></div></dialog>
+  <dialog id="log-dialog"><div class="dialog-top"><h2>编译日志</h2><button id="log-close" class="icon-button">×</button></div><pre id="log-content"></pre></dialog>
+  <div id="toast" role="status" hidden></div>
+  <input id="import-file" type="file" accept=".tex" hidden>
+</body>
+</html>

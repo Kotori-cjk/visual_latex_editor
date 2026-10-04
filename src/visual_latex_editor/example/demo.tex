@@ -1,0 +1,63 @@
+\documentclass[UTF8,a4paper,11pt,fontset=fandol]{ctexart}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,booktabs,graphicx,float,caption,hyperref}
+\hypersetup{hidelinks}
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{0.4em}
+\title{一杯茶的冷却记录}
+\author{Visual LaTeX Editor 示例}
+\date{}
+\begin{document}
+\maketitle
+
+\section{从一杯茶开始}
+这是一份独立的小样例，用来试用可视化编辑器。你可以点击这一段，将它改成自己的观察记录，然后保存并重新编译。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.66\linewidth]{tea-cup.png}
+\caption{一杯茶与它的观察卡片。这张示意图可以替换成你自己的照片。}
+\end{figure}
+
+\subsection{观察计划}
+我们把一杯热茶放在室温环境中，关心它的温度如何随时间变化。本文所有数值都是根据简化模型生成的演示数据，不是实际测量结果。
+
+\subsection{试试修改}
+先选择一个段落修改文字，再选择上面的图片替换文件、调整宽度或编辑图注。公式与表格可以切换到 LaTeX 页签修改。
+
+这个样例保留了普通段落、标题、图片、图注和数学表达式。修改内容后，页面布局交给 LaTeX 重新计算。
+
+\clearpage
+\section{温度怎样变化}
+\subsection{一个简单的模型}
+令室温为 $T_a=22\,^{\circ}\mathrm C$，初始茶温为 $T_0=85\,^{\circ}\mathrm C$，时间常数为 $\tau=8\,\mathrm{min}$。温度曲线写成
+\[
+T(t)=T_a+(T_0-T_a)e^{-t/\tau}.
+\]
+随着温差变小，降温速度也逐渐降低。你可以在 LaTeX 页签中修改这条公式，但图像和表格中的演示数据不会自动随公式变化。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\linewidth]{cooling-curve.png}
+\caption{简化模型生成的冷却曲线。虚线表示室温，圆点对应表格中的时刻。}
+\end{figure}
+
+\subsection{几组演示数据}
+\begin{center}
+\begin{tabular}{rr}
+\toprule
+时间（分钟） & 温度（摄氏度）\\
+\midrule
+0 & 85.0\\
+5 & 55.7\\
+10 & 40.1\\
+15 & 31.7\\
+20 & 27.2\\
+\bottomrule
+\end{tabular}
+\end{center}
+这是按模型计算并四舍五入后的结果。表格可以作为排版练习：试着修改表头、增加一行，或更换说明文字。
+
+\section*{下一步}
+把当前文档导出为包含图片的单文件 .tex，或者下载编译后的 PDF。也可以导入自己的单文件 LaTeX 文档继续编辑。
+\end{document}

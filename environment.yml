@@ -1,0 +1,8 @@
+name: visual-latex
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - tectonic=0.17
+  - poppler

@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -e .
+      - run: python -m unittest discover -s tests -v
+      - run: node --check src/visual_latex_editor/static/app.js
+      - run: python -m pip wheel . --no-deps --wheel-dir dist
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          activate-environment: visual-latex
+          environment-file: environment.yml
+          miniforge-version: latest
+      - run: python -m pip install -e .
+        shell: bash -el {0}
+      - run: visual-latex-editor --check
+        shell: bash -el {0}
+      - run: python scripts/check_integration.py
+        shell: bash -el {0}
