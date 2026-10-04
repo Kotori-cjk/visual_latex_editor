@@ -9,7 +9,7 @@ A local, source-backed LaTeX editor. Click text or images in the **actual compil
 
 一个在本机运行的 LaTeX 可视化编辑器：点选真实 PDF 里的段落和图片，在右侧修改，再重新编译。界面为中文，代码和安装说明可用于独立项目。
 
-![Editor with the tea example](docs/editor-preview.jpg)
+![和贝伦卡斯泰露一起编辑吧！](140100396_p1.png)
 
 ## What you can do
 
