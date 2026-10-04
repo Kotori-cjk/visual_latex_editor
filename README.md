@@ -20,6 +20,8 @@ A local, source-backed LaTeX editor. Click text or images in the **actual compil
 - Save changes, undo recent saves, zoom the preview, search content, and inspect compiler errors.
 - Download the latest compiled PDF, or export a single `.tex` with its raster images embedded.
 - Keep the last successful PDF when a new compilation fails.
+- Configure headers and footers from **页眉页脚**: disable either, use section titles/page numbers, or edit left/center/right text. `{page}` inserts the page number.
+- Automatically discard old compilation caches; retain only the current successful preview and the in-progress build.
 
 **Scope:** this is a block editor, not a Word-style rich-text canvas. Text is selected by source block, formulas and tables are edited as LaTeX, and images are replaced as whole files. PDF hit regions use SyncTeX and are approximate, especially with custom macros; the outline is always available.
 
@@ -93,7 +95,7 @@ By default the project lives under `.visual_latex_editor/` in the directory wher
 └── build/<build-id>/         # PDF, preview pages, SyncTeX and logs
 ```
 
-Saved changes survive restarts. The undo button remembers saves made in the current browser session (up to 25 block saves); it is not a version-control system. Build history is kept on disk. Choose a fresh `--project` directory to start another copy of the example.
+Saved changes survive restarts. The undo button remembers saves made in the current browser session (up to 25 block saves); it is not a version-control system. Only one successful build is retained, with a temporary second directory while compiling. Failed builds are removed while the last valid preview is preserved. Existing managed build history is cleaned after the next compilation. Your source, previous source and assets are preserved. Choose a fresh `--project` directory to start another copy of the example.
 
 ### Import / export
 

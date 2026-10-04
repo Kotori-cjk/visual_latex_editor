@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 
 from PIL import Image
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 from visual_latex_editor import server
 
 
@@ -32,6 +32,46 @@ class ProjectCase(unittest.TestCase):
 
 
 class EditorTests(ProjectCase):
+    def test_restart_restores_valid_preview_even_when_source_has_changed(self):
+        folder=server.BUILD/'1791082513300-1'
+        folder.mkdir()
+        (folder/'report.tex').write_text(server.SOURCE.read_text(encoding='utf-8'),encoding='utf-8')
+        pdf=PdfWriter()
+        pdf.add_blank_page(width=200,height=300)
+        pdf.write(folder/'report.pdf')
+        Image.new('RGB',(2,3),'white').save(folder/'page-1.png')
+        with gzip.open(folder/'report.synctex.gz','wt') as out:
+            out.write('SyncTeX Version:1\nMagnification:1000\nUnit:1\nX Offset:0\nY Offset:0\nContent:\n')
+        server.initialize()
+        self.assertEqual(server.STATE['build_id'],folder.name)
+        self.assertEqual(len(server.STATE['pages']),1)
+        self.assertEqual(server.STATE['preview_revision'],0)
+        server.update_source(server.SOURCE.read_text(encoding='utf-8').replace(r'\maketitle',r'\invalidCommand'))
+        server.initialize()
+        self.assertEqual(server.STATE['build_id'],folder.name)
+        self.assertEqual(server.STATE['preview_revision'],-1)
+
+    def test_page_settings_round_trip_and_literal_text(self):
+        source=server.SOURCE.read_text(encoding='utf-8')
+        settings={'header':'custom','footer':'page','header_left':'Tea & 50% {page}'}
+        first=server.page_style_source(source,settings)
+        self.assertEqual(server.page_settings(first)['header_left'],settings['header_left'])
+        self.assertIn(r'\fancyhead[L]{Tea \& 50\% \thepage}',first)
+        second=server.page_style_source(first,dict(header='off',footer='off'))
+        self.assertEqual(second.count(server.PAGE_BEGIN),1)
+        self.assertNotIn(r'\fancyhead[L]',second)
+        self.assertNotIn(r'\fancyfoot[C]',second)
+        self.assertEqual(source.split(r'\begin{document}',1)[1],second.split(r'\begin{document}',1)[1])
+
+    def test_cleanup_keeps_active_preview_and_unrelated_directory(self):
+        for name in ['1791082513300-1','1791082513301-2','1791082513302-3','my-files']:
+            folder=server.BUILD/name
+            folder.mkdir()
+            (folder/'report.pdf').write_bytes(b'cache')
+        server.STATE['build_id']='1791082513301-2'
+        server.cleanup_builds()
+        self.assertEqual({p.name for p in server.BUILD.iterdir()},{'1791082513301-2','my-files'})
+
     def test_starter_initialization_preserves_existing_edits(self):
         self.assertEqual(server.SOURCE.read_text(encoding='utf-8'), (server.EXAMPLE/'demo.tex').read_text(encoding='utf-8'))
         server.update_source(server.SOURCE.read_text(encoding='utf-8').replace('冷却记录','我的记录',1))
@@ -160,6 +200,12 @@ class HttpTests(ProjectCase):
     def test_pdf_export_requires_current_build(self):
         with self.assertRaises(urllib.error.HTTPError):
             self.request('/api/export/pdf')
+
+    def test_page_settings_use_revision_checked_save(self):
+        state=json.load(self.request('/api/page-settings',{'revision':0,'settings':{'header':'off','footer':'page'}},**{'X-Editor-Token':'test-session'}))
+        self.assertEqual(state['revision'],1)
+        self.assertEqual(state['page_settings']['header'],'off')
+        self.assertEqual(server.SOURCE.read_text(encoding='utf-8'),state['source'])
 
 
 if __name__=='__main__':

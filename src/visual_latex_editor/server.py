@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from PIL import Image, ImageOps
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 APP = Path(__file__).resolve().parent
 PROJECT = Path.cwd() / '.visual_latex_editor'
@@ -69,6 +70,7 @@ def initialize():
             if image.is_file():
                 shutil.copy2(image, ASSETS/image.name)
     STATE['last_saved'] = time.strftime('%H:%M:%S')
+    restore_preview()
 
 
 def image_pdf(data):
@@ -277,11 +279,101 @@ def sync_regions(sync_path, blocks, dimensions):
     return regions
 
 
+
+PAGE_BEGIN = '% BEGIN VLE PAGE STYLE'
+PAGE_END = '% END VLE PAGE STYLE'
+
+
+def page_settings(source):
+    match = re.search(r'^% VLE SETTINGS (.+)$', source, re.M)
+    if match:
+        return json.loads(match[1])
+    plain = bool(re.search(r'\\pagestyle\{plain\}', source))
+    empty = bool(re.search(r'\\pagestyle\{empty\}', source))
+    return {'header': 'off' if plain or empty else 'auto',
+            'footer': 'off' if empty else 'page',
+            'header_left': '', 'header_center': '', 'header_right': '',
+            'footer_left': '', 'footer_center': '', 'footer_right': ''}
+
+
+def page_style_source(source, settings):
+    if settings.get('header') not in ('off', 'auto', 'custom') or settings.get('footer') not in ('off', 'page', 'custom'):
+        raise ValueError('Invalid header/footer mode')
+    values = {'header': settings['header'], 'footer': settings['footer']}
+    for area in ('header', 'footer'):
+        for slot in ('left', 'center', 'right'):
+            key = area + '_' + slot
+            value = settings.get(key, '')
+            if not isinstance(value, str) or len(value) > 200 or '\n' in value or '\r' in value:
+                raise ValueError('Header/footer text must be a single line of at most 200 characters')
+            values[key] = value
+    def tex(text):
+        escapes = {'\\': r'\textbackslash{}', '&': r'\&', '%': r'\%', '$': r'\$', '#': r'\#', '_': r'\_',
+                   '{': r'\{', '}': r'\}', '~': r'\textasciitilde{}', '^': r'\textasciicircum{}'}
+        return r'\thepage'.join(''.join(escapes.get(c, c) for c in part) for part in text.split('{page}'))
+    commands = [r'\fancyhf{}', r'\renewcommand{\headrulewidth}{0pt}', r'\renewcommand{\footrulewidth}{0pt}']
+    for area, command in [('header', 'fancyhead'), ('footer', 'fancyfoot')]:
+        if values[area] == 'custom':
+            for slot, position in [('left', 'L'), ('center', 'C'), ('right', 'R')]:
+                commands.append('\\' + command + '[' + position + ']{' + tex(values[area+'_'+slot]) + '}')
+        elif values[area] == 'auto':
+            commands.append(r'\fancyhead[L]{\nouppercase{\leftmark}}')
+        elif values[area] == 'page':
+            commands.append(r'\fancyfoot[C]{\thepage}')
+    source = re.sub(re.escape(PAGE_BEGIN) + r'.*?' + re.escape(PAGE_END) + r'\n?', '', source, flags=re.S)
+    package = '' if re.search(r'\\usepackage(?:\[[^\]]*\])?\{[^}]*\bfancyhdr\b', source) else '\\usepackage{fancyhdr}\n'
+    body = '\n'.join(commands)
+    block = '\n'.join([PAGE_BEGIN, '% VLE SETTINGS '+json.dumps(values, ensure_ascii=True),
+                       package.rstrip(), r'\setlength{\headheight}{16pt}',
+                       r'\fancypagestyle{vle}{'+body+'}', r'\fancypagestyle{plain}{'+body+'}',
+                       r'\pagestyle{vle}', PAGE_END, ''])
+    return source.replace(r'\begin{document}', block+r'\begin{document}', 1)
+
+
+
+def cached_preview(folder, source):
+    pdf = PdfReader(folder/'report.pdf')
+    dims = {i+1:(float(p.mediabox.width),float(p.mediabox.height)) for i,p in enumerate(pdf.pages)}
+    regions = sync_regions(folder/'report.synctex.gz', parse_blocks(source), dims)
+    pages = []
+    for i,(w,h) in dims.items():
+        png = next(p for p in folder.glob('page-*.png') if int(p.stem.split('-')[-1])==i)
+        pages.append({'number':i,'width':w,'height':h,'image':f'/build/{folder.name}/{png.name}', 'regions':regions[i]})
+    return pages
+
+
+def restore_preview():
+    for folder in sorted(BUILD.iterdir(), reverse=True):
+        if not folder.is_dir() or folder.is_symlink() or not re.fullmatch(r'\d{13}-\d+', folder.name):
+            continue
+        try:
+            source = (folder/'report.tex').read_text(encoding='utf-8')
+            pages = cached_preview(folder, source)
+        except (OSError, ValueError, StopIteration, PdfReadError):
+            continue
+        STATE.update(pages=pages, build_id=folder.name,
+                     preview_revision=STATE['revision'] if source==SOURCE.read_text(encoding='utf-8') else -1)
+        break
+
+
+def cleanup_builds():
+    """Only remove managed compilation caches, never user documents/assets."""
+    root = BUILD.resolve()
+    folders = [p for p in BUILD.iterdir() if p.is_dir() and not p.is_symlink() and re.fullmatch(r'\d{13}-\d+', p.name)]
+    keep = STATE['build_id']
+    if not keep:
+        valid = [p for p in folders if (p/'report.pdf').is_file() and list(p.glob('page-*.png'))]
+        keep = max((p.name for p in valid), default='')
+    for folder in folders:
+        if folder.name != keep and folder.resolve().parent == root:
+            shutil.rmtree(folder)
+
+
 def public_state():
     with LOCK:
         source = SOURCE.read_text(encoding='utf-8')
         return {**STATE, 'blocks': parse_blocks(source), 'source': source,
-                'project': str(SOURCE), 'token': TOKEN}
+                'project': str(SOURCE), 'token': TOKEN, 'page_settings': page_settings(source)}
 
 
 def compile_worker(source, revision):
@@ -290,9 +382,11 @@ def compile_worker(source, revision):
     try:
         folder.mkdir()
         atomic_text(folder / 'report.tex', source)
-        for asset in ASSETS.iterdir():
-            if asset.is_file():
-                shutil.copy2(asset, folder / asset.name)
+        for asset_name in set(re.findall(r'\\includegraphics(?:\[[^\]]*\])?\{([^}]+)\}', source)):
+            asset = (ASSETS/asset_name).resolve()
+            if asset.parent != ASSETS.resolve() or not asset.is_file():
+                raise ValueError('Missing or invalid image: ' + asset_name)
+            shutil.copy2(asset, folder / asset.name)
         if not TECTONIC or not POPPLER:
             raise RuntimeError('找不到已安装的 Tectonic 或 PDF 渲染工具。')
         env = os.environ.copy()
@@ -307,13 +401,7 @@ def compile_worker(source, revision):
                                   cwd=folder, capture_output=True, timeout=120)
         if rendered.returncode:
             raise RuntimeError(rendered.stderr.decode('utf-8',errors='replace'))
-        pdf = PdfReader(folder/'report.pdf')
-        dims = {i+1:(float(p.mediabox.width),float(p.mediabox.height)) for i,p in enumerate(pdf.pages)}
-        regions = sync_regions(folder/'report.synctex.gz', parse_blocks(source), dims)
-        pages = []
-        for i,(w,h) in dims.items():
-            png = next(p for p in folder.glob('page-*.png') if int(p.stem.split('-')[-1])==i)
-            pages.append({'number':i,'width':w,'height':h,'image':f'/build/{name}/{png.name}', 'regions':regions[i]})
+        pages = cached_preview(folder, source)
         with LOCK:
             STATE.update(pages=pages, preview_revision=revision, build_id=name, log=log[-16000:], error='')
     except Exception as exc:
@@ -321,6 +409,10 @@ def compile_worker(source, revision):
             STATE.update(error=str(exc), log=str(exc))
     finally:
         with LOCK:
+            try:
+                cleanup_builds()
+            except OSError as exc:
+                STATE['log'] += '\nCache cleanup: ' + str(exc)
             STATE['busy'] = False
 
 
@@ -447,6 +539,8 @@ class Handler(BaseHTTPRequestHandler):
                 source = SOURCE.read_text(encoding='utf-8')
                 if self.path == '/api/compile':
                     begin_compile()
+                elif self.path == '/api/page-settings':
+                    update_source(page_style_source(source, data['settings']))
                 elif self.path == '/api/save':
                     update_source(data['source'])
                 elif self.path == '/api/block':

@@ -26,8 +26,11 @@ def main():
         log=(root/'server.log').open('wb')
         process=subprocess.Popen([sys.executable,'-m','visual_latex_editor','--port',str(port),'--project',str(root/'project')],stdout=log,stderr=log)
         def get(route='/api/state'):
-            with urllib.request.urlopen(url+route,timeout=10) as response:
-                return json.load(response) if route=='/api/state' else response.read()
+            try:
+                with urllib.request.urlopen(url+route,timeout=10) as response:
+                    return json.load(response) if route=='/api/state' else response.read()
+            except urllib.error.HTTPError as exc:
+                raise AssertionError(exc.read().decode()) from exc
         def post(route,state,**data):
             request=urllib.request.Request(url+route,json.dumps({'revision':state['revision'],**data}).encode(),
                 {'Content-Type':'application/json','X-Editor-Token':state['token']})
@@ -53,6 +56,22 @@ def main():
             mapped={r['block_id'] for p in state['pages'] for r in p['regions']}
             assert len(figures)==2 and all(b['id'] in mapped for b in figures)
             print('PASS: two-page example and both clickable images',flush=True)
+
+            saved=post('/api/page-settings',state,settings={'header':'custom','footer':'custom','header_left':'TEA-HEADER','footer_center':'Page {page}'})
+            post('/api/compile',saved)
+            state=wait()
+            assert not state['error'],state['error']
+            pdf=PdfReader(io.BytesIO(get('/api/export/pdf')))
+            for i,page in enumerate(pdf.pages,1):
+                text=page.extract_text()
+                assert 'TEA-HEADER' in text and f'Page {i}' in text
+            saved=post('/api/page-settings',state,settings={'header':'off','footer':'off'})
+            post('/api/compile',saved)
+            state=wait()
+            assert not state['error'],state['error']
+            pdf=PdfReader(io.BytesIO(get('/api/export/pdf')))
+            assert all('TEA-HEADER' not in page.extract_text() and 'Page ' not in page.extract_text() for page in pdf.pages)
+            print('PASS: editable header/footer and disabling both on every page',flush=True)
 
             block=next(b for b in state['blocks'] if b['kind']=='text')
             saved=post('/api/block',state,id=block['id'],source=block['source']+' EDITOR-INTEGRATION-MARKER')
@@ -80,6 +99,7 @@ def main():
             post('/api/compile',saved)
             state=wait()
             assert state['error'] and state['build_id']==previous
+            assert [p.name for p in (root/'project/build').iterdir() if p.is_dir()]==[previous]
             saved=post('/api/save',state,source=source)
             post('/api/compile',saved)
             state=wait()
@@ -95,6 +115,8 @@ def main():
             assert result.returncode==0,(result.stdout+result.stderr).decode(errors='replace')
             assert len(PdfReader(standalone/'export.pdf').pages)==2
             print('PASS: standalone export compiles without external image files',flush=True)
+            assert len(list((root/'project/build').iterdir()))==1
+            print('PASS: repeated successful and failed builds retain only the current preview',flush=True)
             print('ALL INTEGRATION CHECKS PASSED',flush=True)
         finally:
             process.terminate()

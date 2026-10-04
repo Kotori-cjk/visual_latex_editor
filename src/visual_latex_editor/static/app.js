@@ -174,3 +174,31 @@ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLower
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 window.addEventListener('resize',setZoom);
 api('/api/state').then(receive).catch(e=>{$('notice-text').textContent='服务连接失败：'+e.message;toast(e.message,true);});
+
+function pageFields(){
+  for(const area of ['header','footer'])$(area+'-fields').hidden=$(area+'-mode').value!=='custom';
+}
+$('page-settings').onclick=async()=>{
+  if(dirty&&!await apply())return;
+  const settings=state.page_settings;
+  for(const area of ['header','footer']){
+    $(area+'-mode').value=settings[area];
+    for(const slot of ['left','center','right'])$(area+'-'+slot).value=settings[area+'_'+slot];
+  }
+  pageFields();$('page-dialog').showModal();
+};
+$('header-mode').onchange=pageFields;$('footer-mode').onchange=pageFields;
+$('page-close').onclick=()=>$('page-dialog').close();
+$('page-save').onclick=async()=>{
+  const settings={};
+  for(const area of ['header','footer']){
+    settings[area]=$(area+'-mode').value;
+    for(const slot of ['left','center','right'])settings[area+'_'+slot]=$(area+'-'+slot).value;
+  }
+  try{
+    const before=state.source,next=await api('/api/page-settings',{settings});
+    if(next.source!==before){history.push(before);if(history.length>25)history.shift();}
+    receive(next);selected=null;$('editor').hidden=true;$('inspector-empty').hidden=false;
+    $('page-dialog').close();await compile();
+  }catch(e){toast(e.message,true);}
+};
