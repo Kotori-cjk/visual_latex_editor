@@ -32,6 +32,37 @@ class ProjectCase(unittest.TestCase):
 
 
 class EditorTests(ProjectCase):
+
+    def test_new_document_archives_source_assets_and_clears_preview(self):
+        before=server.SOURCE.read_bytes()
+        server.STATE.update(build_id='old',pages=[{'number':1}],preview_revision=0)
+        server.new_document('新的 50% & 文档')
+        archives=list((server.PROJECT/'documents').iterdir())
+        self.assertEqual(len(archives),1)
+        self.assertEqual((archives[0]/'report.tex').read_bytes(),before)
+        self.assertEqual((archives[0]/'assets/tea-cup.png').read_bytes(),(server.ASSETS/'tea-cup.png').read_bytes())
+        self.assertIn(r'50\% \&',server.SOURCE.read_text(encoding='utf-8'))
+        self.assertEqual(server.STATE['pages'],[])
+        self.assertEqual(server.STATE['preview_revision'],-1)
+
+    def test_new_document_rejects_busy_and_invalid_title_without_changes(self):
+        before=server.SOURCE.read_bytes()
+        server.STATE['busy']=True
+        with self.assertRaises(ValueError): server.new_document('title')
+        server.STATE['busy']=False
+        with self.assertRaises(ValueError): server.new_document(' ')
+        self.assertEqual(server.SOURCE.read_bytes(),before)
+        self.assertFalse((server.PROJECT/'documents').exists())
+
+    def test_blank_project_initialization_and_restart(self):
+        server.SOURCE.unlink()
+        server.initialize('blank')
+        self.assertNotIn('includegraphics',server.SOURCE.read_text(encoding='utf-8'))
+        server.update_source(server.blank_source('My document'))
+        server.initialize('blank')
+        self.assertIn('My document',server.SOURCE.read_text(encoding='utf-8'))
+
+
     def test_restart_restores_valid_preview_even_when_source_has_changed(self):
         folder=server.BUILD/'1791082513300-1'
         folder.mkdir()
@@ -196,6 +227,14 @@ class HttpTests(ProjectCase):
             self.assertEqual(denied.exception.code,403)
         with self.assertRaises(urllib.error.HTTPError):
             self.request('/assets/../report.tex')
+
+
+    def test_new_document_requires_current_revision(self):
+        state=json.load(self.request('/api/new',{'revision':0,'title':'New'},**{'X-Editor-Token':'test-session'}))
+        self.assertIn(r'\title{New}',state['source'])
+        with self.assertRaises(urllib.error.HTTPError) as conflict:
+            self.request('/api/new',{'revision':0,'title':'Stale'},**{'X-Editor-Token':'test-session'})
+        self.assertEqual(conflict.exception.code,409)
 
     def test_pdf_export_requires_current_build(self):
         with self.assertRaises(urllib.error.HTTPError):

@@ -12,3 +12,8 @@ dist/
 *.pid
 .DS_Store
 Thumbs.db
+
+/tools/
+*.lnk
+/local-icon.ico
+/legacy-editor/

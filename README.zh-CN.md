@@ -88,3 +88,11 @@ python scripts/check_integration.py
 最后一项需要编译与渲染工具，验证真实 PDF 编译、文字保存、图片替换、编译失败恢复和独立导出。测试使用临时文档，不修改已有文档。GitHub Actions 配置了三个平台的单元测试、wheel 打包以及 Linux 上的真实编译测试。
 
 贡献方式见 [CONTRIBUTING.md](CONTRIBUTING.md)，本地运行范围见 [SECURITY.md](SECURITY.md)。代码、原创示例与插图采用 [MIT 许可证](LICENSE)；编译工具与 Python 依赖各自使用其原有许可证。
+
+## 新建文档与 Windows 启动
+
+本机双击 `start.bat` 或桌面快捷方式启动。再次启动会打开已有编辑器。
+新项目默认从空白文档开始；`--template example` 可选示例。已有项目继续打开原文档。
+点击“新建文档”输入标题；旧文档和图片自动保存在项目的 `documents/<时间戳>/`，可用 `--project` 打开该目录。
+使用“插入内容”添加段落、标题、公式、表格或上传图片，插入位置为当前选中块之后（未选中时为文末）。
+`tools/`、用户文档和个人图标仅保留本机，不提交到 Git。其他电脑仍需按上文安装依赖。

@@ -3,7 +3,7 @@ const $ = id => document.getElementById(id);
 const labels = {title:'文档标题',heading:'标题',text:'文字',math:'公式',table:'表格',figure:'图片',latex:'LaTeX'};
 const icons = {title:'T',heading:'H',text:'¶',math:'ƒ',table:'▦',figure:'▧',latex:'{}'};
 let state, selected, mode='visual', filter='all', dirty=false, upload=null, zoom=1;
-let history=[], polling=null, toastTimer, compiledSignature='';
+let history=[], polling=null, toastTimer, compiledSignature='', inserting=false;
 const esc = text => String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(message,error=false){$('toast').textContent=message;$('toast').style.background=error?'#a6543b':'#284c3d';$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4500);}
 async function api(path,data){
@@ -26,7 +26,7 @@ function drawPages(){
   const signature=state.build_id;
   if(signature===compiledSignature)return;
   compiledSignature=signature;
-  if(!state.pages.length)return;
+  if(!state.pages.length){$('pages').innerHTML='<div class="empty-preview"><h2>新文档已就绪</h2><p>插入内容开始写作，或编译查看 PDF。</p></div>';return;}
   const scroll=$('preview-scroll').scrollTop;
   $('pages').innerHTML=state.pages.map(p=>`<article class="pdf-page" data-page="${p.number}" style="aspect-ratio:${p.width}/${p.height}"><span class="page-number">${p.number}</span><img src="${p.image}" alt="报告第 ${p.number} 页">${p.regions.map(r=>{
     const b=state.blocks.find(b=>b.id===r.block_id);return `<button class="hit ${b?.kind||''}" data-id="${r.block_id}" aria-label="编辑${labels[b?.kind]||'内容'}：${esc((b?.label||'').slice(0,80))}" title="${esc((b?.label||'点击编辑').slice(0,90))}" style="left:${r.x*100}%;top:${r.y*100}%;width:${r.w*100}%;height:${r.h*100}%"></button>`;
@@ -42,7 +42,9 @@ function highlight(){
 function refreshControls(){
   $('save-status').textContent=dirty?'有未保存修改':'已保存 '+state.last_saved;
   $('undo').disabled=!history.length||state.busy;
-  $('compile').disabled=state.busy;
+  $('compile').disabled=state.busy||inserting;
+  $('insert-block').disabled=inserting;
+  $('new-document').disabled=state.busy;
   $('compile').innerHTML=state.busy?'正在编译…':'<span>▶</span> 编译 PDF';
   $('export-pdf').disabled=state.busy||state.preview_revision!==state.revision||!state.pages.length;
   $('page-count').textContent=state.pages.length?state.pages.length+' 页':'';
@@ -201,4 +203,44 @@ $('page-save').onclick=async()=>{
     receive(next);selected=null;$('editor').hidden=true;$('inspector-empty').hidden=false;
     $('page-dialog').close();await compile();
   }catch(e){toast(e.message,true);}
+};
+
+$('new-document').onclick=()=>{if(leaveDirty())$('new-dialog').showModal();};
+$('new-close').onclick=()=>$('new-dialog').close();
+$('new-create').onclick=async()=>{
+  try{
+    const next=await api('/api/new',{title:$('new-title').value});
+    dirty=false;selected=null;history=[];upload=null;
+    receive(next);$('editor').hidden=true;$('inspector-empty').hidden=false;
+    $('new-dialog').close();toast('已创建新文档，旧文档已归档。');await compile();
+  }catch(e){toast(e.message,true);}
+};
+async function insertBlock(kind,image=null){
+  if(inserting)return;
+  if(dirty&&!await apply())return;
+  inserting=true;refreshControls();
+  const snippets={"text": "在这里输入新段落。", "heading": "\\section{新标题}", "math": "\\[\nE = mc^2\n\\]", "table": "\\begin{table}[H]\n\\centering\n\\begin{tabular}{ll}\n\\toprule\n项目 & 数值 \\\\\n\\midrule\n示例 & 1 \\\\\n\\bottomrule\n\\end{tabular}\n\\caption{表格说明}\n\\end{table}", "figure": "\\begin{figure}[H]\n\\centering\n\\includegraphics[width=0.7\\linewidth]{new-image.pdf}\n\\caption{图片说明}\n\\end{figure}"};
+  try{
+    const before=state.source;
+    const position=selected?state.blocks.find(b=>b.id===selected.id)?.end:undefined;
+    const bodyStart=before.indexOf('\\begin{document}')+'\\begin{document}'.length;
+    const index=position!==undefined&&position>=bodyStart?position:before.lastIndexOf('\\end{document}');
+    const source=before.slice(0,index)+'\n\n'+snippets[kind]+'\n\n'+before.slice(index);
+    let next=await api('/api/save',{source});
+    history.push(before);dirty=false;selected=null;receive(next);
+    const block=next.blocks.find(b=>b.start>=index&&b.source.includes(kind==='figure'?'new-image.pdf':snippets[kind]));
+    if(image&&block){next=await api('/api/block',{id:block.id,source:block.source,image});receive(next);}
+    if(block)selectBlock(block.id,true);
+    toast('已插入内容，可在右侧编辑。');
+  }catch(e){toast(e.message,true);}finally{inserting=false;refreshControls();}
+}
+$('insert-block').onchange=()=>{
+  const kind=$('insert-block').value;$('insert-block').value='';
+  if(kind==='figure')$('insert-image').click();else if(kind)insertBlock(kind);
+};
+$('insert-image').onchange=()=>{
+  const file=$('insert-image').files[0];if(!file)return;
+  if(file.size>24*1024*1024){toast('图片需要小于 24 MB。',true);return;}
+  const reader=new FileReader();reader.onload=()=>insertBlock('figure',String(reader.result).split(',')[1]);
+  reader.readAsDataURL(file);$('insert-image').value='';
 };

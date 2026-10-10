@@ -24,7 +24,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='visual-latex-check-') as directory:
         root=Path(directory)
         log=(root/'server.log').open('wb')
-        process=subprocess.Popen([sys.executable,'-m','visual_latex_editor','--port',str(port),'--project',str(root/'project')],stdout=log,stderr=log)
+        process=subprocess.Popen([sys.executable,'-m','visual_latex_editor','--port',str(port),'--template','example','--project',str(root/'project')],stdout=log,stderr=log)
         def get(route='/api/state'):
             try:
                 with urllib.request.urlopen(url+route,timeout=10) as response:

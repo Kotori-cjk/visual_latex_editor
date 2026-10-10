@@ -61,11 +61,38 @@ def unpack_source(source):
     return source
 
 
-def initialize():
+
+def blank_source(title='未命名文档'):
+    if not isinstance(title, str) or not title.strip() or len(title)>200:
+        raise ValueError('请输入 1–200 字的文档标题。')
+    escapes = {'\\': r'\textbackslash{}', '&': r'\&', '%': r'\%', '$': r'\$',
+               '#': r'\#', '_': r'\_', '{': r'\{', '}': r'\}',
+               '~': r'\textasciitilde{}', '^': r'\textasciicircum{}'}
+    title=''.join(escapes.get(c,c) for c in ' '.join(title.split()))
+    return '\n'.join([r'\documentclass[UTF8,a4paper,11pt,fontset='+('windows' if os.name == 'nt' else 'fandol')+']{ctexart}',
+        r'\usepackage[margin=2.4cm]{geometry}',
+        r'\usepackage{amsmath,booktabs,graphicx,float,caption,hyperref}',
+        r'\hypersetup{hidelinks}',r'\title{'+title+'}',r'\author{}',r'\date{}',
+        r'\begin{document}',r'\maketitle','','从这里开始写作。','',r'\end{document}',''])
+
+
+def new_document(title):
+    if STATE['busy']:
+        raise ValueError('请等待编译结束后再新建文档。')
+    source=blank_source(title)
+    archive=PROJECT/'documents'/(time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(3))
+    archive.mkdir(parents=True)
+    shutil.copy2(SOURCE, archive/'report.tex')
+    shutil.copytree(ASSETS, archive/'assets')
+    update_source(source)
+    STATE.update(pages=[],build_id='',preview_revision=-1,error='',log='')
+
+
+def initialize(template="example"):
     ASSETS.mkdir(parents=True, exist_ok=True)
     BUILD.mkdir(parents=True, exist_ok=True)
     if not SOURCE.exists():
-        atomic_text(SOURCE, (EXAMPLE/'demo.tex').read_text(encoding='utf-8'))
+        atomic_text(SOURCE, blank_source() if template == 'blank' else (EXAMPLE/'demo.tex').read_text(encoding='utf-8'))
         for image in (EXAMPLE/'assets').iterdir():
             if image.is_file():
                 shutil.copy2(image, ASSETS/image.name)
@@ -539,6 +566,8 @@ class Handler(BaseHTTPRequestHandler):
                 source = SOURCE.read_text(encoding='utf-8')
                 if self.path == '/api/compile':
                     begin_compile()
+                elif self.path == '/api/new':
+                    new_document(data.get('title', '未命名文档'))
                 elif self.path == '/api/page-settings':
                     update_source(page_style_source(source, data['settings']))
                 elif self.path == '/api/save':
@@ -585,6 +614,7 @@ def main():
     parser.add_argument('--pdftoppm', default=os.environ.get('VISUAL_LATEX_PDFTOPPM'), help='Poppler pdftoppm executable (default: PATH)')
     parser.add_argument('--cache', type=Path, default=os.environ.get('TECTONIC_CACHE_DIR'), help='Optional Tectonic cache directory')
     parser.add_argument('--check', action='store_true', help='Check dependencies and exit')
+    parser.add_argument('--template', choices=['blank','example'], default='blank', help='Starter for a new project (default: blank)')
     parser.add_argument('--open', action='store_true', help='Open the editor in the default browser')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
@@ -599,7 +629,7 @@ def main():
     PROJECT = args.project.expanduser().resolve()
     ASSETS, SOURCE, BUILD = PROJECT/'assets', PROJECT/'report.tex', PROJECT/'build'
     CACHE = args.cache.expanduser().resolve() if args.cache else None
-    initialize()
+    initialize(args.template)
     httpd = ThreadingHTTPServer(('127.0.0.1',args.port), Handler)
     begin_compile()
     url = f'http://127.0.0.1:{args.port}'

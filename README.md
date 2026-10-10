@@ -67,7 +67,7 @@ visual-latex-editor --tectonic /path/to/tectonic --pdftoppm /path/to/pdftoppm --
 
 Or set `VISUAL_LATEX_TECTONIC` and `VISUAL_LATEX_PDFTOPPM`. On Windows use paths to the `.exe` files. After installation, `scripts/start.cmd` or `sh scripts/start.sh` launches the editor. The server remains attached to its terminal; press **Ctrl+C** to stop it.
 
-Open **http://127.0.0.1:8765**. The included tea example loads automatically into an editable copy.
+Open **http://127.0.0.1:8765**. A blank document is created for a new project. Use `--template example` to start with the tea example.
 
 ## A small, original example
 
@@ -97,7 +97,7 @@ By default the project lives under `.visual_latex_editor/` in the directory wher
 └── build/<build-id>/         # PDF, preview pages, SyncTeX and logs
 ```
 
-Saved changes survive restarts. The undo button remembers saves made in the current browser session (up to 25 block saves); it is not a version-control system. Only one successful build is retained, with a temporary second directory while compiling. Failed builds are removed while the last valid preview is preserved. Existing managed build history is cleaned after the next compilation. Your source, previous source and assets are preserved. Choose a fresh `--project` directory to start another copy of the example.
+Saved changes survive restarts. The undo button remembers saves made in the current browser session (up to 25 block saves); it is not a version-control system. Only one successful build is retained, with a temporary second directory while compiling. Failed builds are removed while the last valid preview is preserved. Existing managed build history is cleaned after the next compilation. Your source, previous source and assets are preserved. Choose a fresh `--project` directory to start another document; add `--template example` for the example.
 
 ### Import / export
 
@@ -145,3 +145,11 @@ docs/                               preview and project notes
 ## License
 
 MIT. The application, starter text and generated illustrations are covered by [`LICENSE`](LICENSE). Tectonic, Poppler and Python dependencies retain their own licenses and are installed separately.
+
+## 新建文档与 Windows 启动
+
+本机双击 `start.bat` 或桌面快捷方式启动。再次启动会打开已有编辑器。
+新项目默认从空白文档开始；`--template example` 可选示例。已有项目继续打开原文档。
+点击“新建文档”输入标题；旧文档和图片自动保存在项目的 `documents/<时间戳>/`，可用 `--project` 打开该目录。
+使用“插入内容”添加段落、标题、公式、表格或上传图片，插入位置为当前选中块之后（未选中时为文末）。
+`tools/`、用户文档和个人图标仅保留本机，不提交到 Git。其他电脑仍需按上文安装依赖。
